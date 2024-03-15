@@ -1,3 +1,3 @@
 # airflow_template
 
-Creating a Python package with a local Airflow. The package is created with Poetry.
+Creating a Python Package Structure with a local Airflow
