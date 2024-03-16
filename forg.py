@@ -92,7 +92,7 @@ def create_project_structure():
     # Initialisiere das Python-Paket mit Poetry, falls es nicht bereits existiert
     if not (current_dir / "pyproject.toml").exists():
         poetry_create_package(project_name)
-        poetry_add_dependencies(DEPENDENCIES)
+        # poetry_add_dependencies(DEPENDENCIES)
         # poetry_add_dependencies(DEPENDENCIES_DEV)
     else:
         poetry_install_package()
