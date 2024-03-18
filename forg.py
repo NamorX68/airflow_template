@@ -3,7 +3,11 @@ import subprocess
 from pathlib import Path
 
 DEPENDENCIES = ['pandas@^2.2.0', 'pydantic@^2.6.1']
-DEPENDENCIES_DEV = ['apache-airflow==2.8.2', 'virtualenv@^20.25.1']
+DEPENDENCIES_DEV = ['apache-airflow==2.8.2',
+                    'virtualenv@^20.25.1',
+                    'apache-airflow-providers-oracle>=1.3.1',
+                    'oracledb>=1.0.0',
+                    ]
 
 
 def write_dict_to_json_file(file_path, data):
@@ -89,7 +93,7 @@ def create_util_file(file_path):
         return f'/opt/airflow/dags/{name}.zip'
     """
     write_text_to_file(file_path=file_path, data=txt)
-    
+
 
 def create_default_file(file_path):
     txt = """
@@ -104,9 +108,47 @@ def create_default_file(file_path):
     write_text_to_file(file_path=file_path, data=txt)
 
 
-def create_dag_template(file_path):
+def create_dag_template(file_path, project_name):
     txt = f"""
-    """
+import tempfile
+from airflow.decorators import dag, task
+from utils import is_prod, get_python_path
+from default_args import default_args
+
+VENV_CACHE_PATH = tempfile.gettempdir()
+
+@task.virtualenv(
+    requirements=[
+        "pandas==2.2.0",
+        "apache-airflow==2.8.2",
+    ],
+    venv_cache_path=VENV_CACHE_PATH,
+)
+def {project_name}_task(python_extra_path: str):
+    import sys
+    import utils
+
+    sys.path.insert(0, python_extra_path)
+    print(sys.path)
+
+    # Import project package
+    import apache-airflow-providers-oracle>=1.3.1,
+    from {project_name} import *
+
+    # --------  Dag Logic ---------------
+
+@dag(
+    dag_id='{project_name}',
+    schedule="@daily" if is_prod() else None,
+    tags=["INSERT TAGS"],
+    default_args=default_args,
+)
+def {project_name}_dag():
+    {project_name}_task(get_python_path('{project_name}'))
+
+
+{project_name}_dag()
+"""
     write_text_to_file(file_path=file_path, data=txt)
 
 
@@ -117,20 +159,20 @@ def create_airflow_config(file_path):
         txt = f"""
     [core]
     load_examples = False
-     
+
     [database]
     load_default_connections = False
-     
+
     [logging]
     worker_log_server_port = {logserver_port} # Auf freien Port anpassen!
     file_task_handler_new_folder_permissions = 0o700
     file_task_handler_new_file_permissions = 0o600
-     
+
     [webserver]
     expose_config = True
     enable_swagger_ui = False
     web_server_port = {airflow_port} # Auf freien Port anpassen!
-     
+
     [scheduler]
     parsing_processes = 1
     """
@@ -138,7 +180,7 @@ def create_airflow_config(file_path):
 
 
 def poetry_create_package(project_name: str):
-    poetry_command = ['poetry', 'init', '--name', project_name]
+    poetry_command = ['poetry', 'init', '--name', project_name, '--python', '>=3.11, <3.12']
     subprocess.run(poetry_command)
 
 
@@ -177,11 +219,13 @@ def create_project_structure():
     dags_folder = current_dir / 'dags'
     create_util_file(file_path=(dags_folder / 'util.py'))
     create_default_file(file_path=(dags_folder / 'default_args.py'))
-    create_dag_template(file_path=(dags_folder / 'app.py'))
+    create_dag_template(file_path=(dags_folder / 'app.py'), project_name=project_name)
 
-    create_airflow_config(Path('~/airflow/airflow.cfg'))
+    airflow_path = Path.home() / 'airflow'
+    airflow_path.mkdir(exist_ok=True)
+    create_airflow_config((airflow_path / 'airflow.cfg'))
 
-    print(f'Projektstruktur für '{current_dir.name}' wurde erstellt.')
+    print(f"Projektstruktur für '{current_dir.name}' wurde erstellt.")
 
 
 def main():
